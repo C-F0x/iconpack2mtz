@@ -13,7 +13,9 @@ from utils import log
 from spec  import ALIASES
 
 # ── Icon size for generated system assets ─────────────────────────────────────
-_ICON_SIZE    = 192          # px — matches xxhdpi (96 dpi × 2)
+_ICON_SIZE     = 192          # px — canvas size, matches xxhdpi
+_CIRCLE_MARGIN = 9            # px each side → effective circle diameter = 192 - 2×9 = 174px
+_SUPERSAMPLE   = 4            # draw at 4× then downscale for antialiased edges
 _SCALE        = 0.80         # icon scaled to 80% of circle before compositing
 _BG_COLOR     = (220, 220, 220, 255)   # light grey background  (#DCDCDC)
 
@@ -34,30 +36,40 @@ _TRANSFORM_CONFIG_XML = """\
 
 # ── System asset generators ───────────────────────────────────────────────────
 
-def _make_circle_mask(size: int = _ICON_SIZE) -> bytes:
+def _circle_png(size: int, margin: int, fill: tuple) -> bytes:
     """
-    White circle on transparent background → icon_mask.png.
-    HyperOS uses white pixels as the visible region.
+    Draw an antialiased circle via supersampling.
+    Circle is inset by `margin` px on each side.
+    Transparent background.
     """
-    img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse([0, 0, size - 1, size - 1], fill=(255, 255, 255, 255))
+    big    = size * _SUPERSAMPLE
+    m_big  = margin * _SUPERSAMPLE
+    img    = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    ImageDraw.Draw(img).ellipse(
+        [m_big, m_big, big - m_big - 1, big - m_big - 1],
+        fill=fill,
+    )
+    img = img.resize((size, size), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, "PNG")
     return buf.getvalue()
+
+
+def _make_circle_mask(size: int = _ICON_SIZE) -> bytes:
+    """
+    White circle (174px diameter, antialiased) on transparent 192×192 canvas → icon_mask.png.
+    HyperOS uses white pixels as the visible region.
+    Matches icon pack's own effective circle diameter.
+    """
+    return _circle_png(size, _CIRCLE_MARGIN, fill=(255, 255, 255, 255))
 
 
 def _make_pattern(size: int = _ICON_SIZE) -> bytes:
     """
-    Solid light-grey circle on transparent background → icon_pattern.png.
-    Shown as background for unthemed icons.
+    Light-grey circle (174px diameter, antialiased) on transparent 192×192 canvas → icon_pattern.png.
+    Shown as background for unthemed icons, same circle size as mask.
     """
-    img  = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse([0, 0, size - 1, size - 1], fill=_BG_COLOR)
-    buf = io.BytesIO()
-    img.save(buf, "PNG")
-    return buf.getvalue()
+    return _circle_png(size, _CIRCLE_MARGIN, fill=_BG_COLOR)
 
 
 def _make_border(size: int = _ICON_SIZE) -> bytes:

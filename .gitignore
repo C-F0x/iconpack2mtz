@@ -3,3 +3,6 @@
 *.xapk
 /.idea
 /__pycache__
+
+*.log
+*.mtz
