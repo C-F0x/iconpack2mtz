@@ -1,0 +1,5 @@
+*.apk
+*.apks
+*.xapk
+/.idea
+/__pycache__
